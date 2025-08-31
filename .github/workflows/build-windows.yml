@@ -1,0 +1,43 @@
+name: Build Windows Executable
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+    - name: Build executable
+      run: |
+        pyinstaller --onefile --windowed --name=WaterBillProcessor --add-data="config.py;." --add-data="BioMarin Pharmaceutical Inc. Account Allocation - Marin Municipal Water District - Template.xlsx;." --add-data="BioMarin Pharmaceutical Inc. Account Allocation - North Marin Water - Template.xlsx;." main.py
+
+    - name: Create distribution package
+      run: |
+        mkdir distribution
+        copy dist\WaterBillProcessor.exe distribution\
+        copy Install.bat distribution\
+        copy README-Windows.txt distribution\
+
+    - name: Upload executable
+      uses: actions/upload-artifact@v4
+      with:
+        name: WaterBillProcessor-Windows-v1.0
+        path: distribution/
+        retention-days: 30

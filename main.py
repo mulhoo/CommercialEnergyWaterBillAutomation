@@ -3,7 +3,6 @@
 Water Bill PDF Processor - Main Entry Point
 Processes batch PDFs, renames files, and generates Excel reports
 """
-
 import tkinter as tk
 from shutil import which
 
@@ -24,7 +23,6 @@ def check_system_dependencies():
         missing.append("Tesseract OCR (brew install tesseract / choco install tesseract)")
     if which("pdftoppm") is None:
         missing.append("Poppler (brew install poppler / choco install poppler)")
-
     if missing:
         raise RuntimeError("Missing system dependencies:\n- " + "\n- ".join(missing))
 
@@ -42,4 +40,5 @@ def main():
     return 0
 
 if __name__ == "__main__":
-    exit(main())
+    import sys
+    sys.exit(main())
