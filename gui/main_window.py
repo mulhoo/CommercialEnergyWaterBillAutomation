@@ -19,34 +19,39 @@ from extractors.nmwd import NMWDExtractor
 from extractors.mmwd import MMWDExtractor
 from processors.file_renamer import FileRenamer
 from processors.excel_processor import ExcelProcessor
-from config import BASE_DIR, BILLS_DIRS, month_year_folder
+from config import BASE_DIR, BILLS_DIRS, month_year_folder, ensure_directories
 
 class WaterBillProcessorGUI:
     """Main GUI application for water bill processing"""
 
     def __init__(self, root):
-        self.root = root
-        self.root.title("Commercial Energy Water Bill PDF Processor")
+            self.root = root
+            self.root.title("Commercial Energy Water Bill PDF Processor")
 
-        sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
-        w = max(1000, int(sw * 0.65))
-        h = max(720, int(sh * 0.70))
-        self.root.geometry(f"{w}x{h}")
-        self.root.minsize(1000, 720)
+            sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+            w = max(1000, int(sw * 0.65))
+            h = max(720, int(sh * 0.70))
+            self.root.geometry(f"{w}x{h}")
+            self.root.minsize(1000, 720)
 
-        self.nmwd_extractor = NMWDExtractor()
-        self.mmwd_extractor = MMWDExtractor()
-        self.renamer = FileRenamer()
-        self.excel_processor = ExcelProcessor()
+            self.nmwd_extractor = NMWDExtractor()
+            self.mmwd_extractor = MMWDExtractor()
+            self.renamer = FileRenamer()
+            self.excel_processor = ExcelProcessor()
 
-        self.selected_files = []
-        self._processing = False
-        self._dialog_open = False
-        self._last_dir = None
+            self.selected_files = []
+            self._processing = False
+            self._dialog_open = False
+            self._last_dir = None
 
-        BASE_DIR.mkdir(exist_ok=True)
+            # Create directories when needed, not on import
+            from config import ensure_directories
+            try:
+                ensure_directories()
+            except Exception as e:
+                print(f"Warning: Could not create directories: {e}")
 
-        self.setup_gui()
+            self.setup_gui()
 
     def setup_gui(self):
         """Setup the GUI components"""

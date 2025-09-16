@@ -6,10 +6,24 @@ from pathlib import Path
 from calendar import month_name
 from datetime import datetime
 
-DESKTOP = Path.home() / "Desktop"
-BASE_DIR = DESKTOP / "Reports & Bills"
-REPORTS_ROOT = BASE_DIR / "Reports"
-BILLS_ROOT = BASE_DIR / "Bills"
+# Get the directory where the executable is located
+def get_base_dir():
+    """Get the base directory for the application"""
+    import sys
+    import os
+
+    if getattr(sys, 'frozen', False):
+        # Running as PyInstaller bundle
+        app_dir = Path(sys.executable).parent
+    else:
+        # Running from source
+        app_dir = Path(__file__).parent
+
+    return app_dir
+
+BASE_DIR = get_base_dir() / "Bills"
+REPORTS_ROOT = get_base_dir() / "Reports"
+BILLS_ROOT = BASE_DIR
 
 REPORTS_DIRS = {
     "North Marin": REPORTS_ROOT / "North Marin",
@@ -54,3 +68,17 @@ def month_year_folder(bill_date_str: str) -> str:
     except Exception:
         dt = datetime.now()
     return f"{month_name[dt.month]} {dt.year}"
+
+def ensure_directories():
+    """Create directories if they don't exist - call this when needed, not on import"""
+    try:
+        BASE_DIR.mkdir(exist_ok=True)
+        REPORTS_ROOT.mkdir(exist_ok=True)
+        for dir_path in REPORTS_DIRS.values():
+            dir_path.mkdir(parents=True, exist_ok=True)
+        for dir_path in BILLS_DIRS.values():
+            dir_path.mkdir(parents=True, exist_ok=True)
+        return True
+    except Exception as e:
+        print(f"Warning: Could not create directories: {e}")
+        return False
