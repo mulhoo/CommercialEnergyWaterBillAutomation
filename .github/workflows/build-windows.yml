@@ -1,9 +1,9 @@
-name: Build Windows Executable
+name: Build Windows Executable with Dependencies
 
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:  # Allows manual triggering
+  workflow_dispatch:
 
 jobs:
   build-windows:
@@ -18,15 +18,31 @@ jobs:
       with:
         python-version: '3.10'
 
-    - name: Install dependencies
+    - name: Download Tesseract
+      run: |
+        mkdir dependencies
+        cd dependencies
+        curl -L -o tesseract-installer.exe "https://github.com/UB-Mannheim/tesseract/releases/download/v5.3.3/tesseract-ocr-w64-setup-5.3.3.20231005.exe"
+        # Extract using 7zip (available on GitHub runners)
+        7z x tesseract-installer.exe -otesseract -y
+        ls tesseract
+
+    - name: Download Poppler
+      run: |
+        cd dependencies
+        curl -L -o poppler.zip "https://github.com/oschwartz10612/poppler-windows/releases/download/v23.08.0-0/Release-23.08.0-0.zip"
+        7z x poppler.zip -opoppler -y
+        ls poppler
+
+    - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pyinstaller
 
-    - name: Build executable
+    - name: Build executable with bundled dependencies
       run: |
-        pyinstaller --onefile --windowed --name=WaterBillProcessor --add-data="config.py;." --add-data="BioMarin Pharmaceutical Inc. Account Allocation - Marin Municipal Water District - Template.xlsx;." --add-data="BioMarin Pharmaceutical Inc. Account Allocation - North Marin Water - Template.xlsx;." main.py
+        pyinstaller --onefile --windowed --name=WaterBillProcessor --add-data="config.py;." --add-data="BioMarin Pharmaceutical Inc. Account Allocation - Marin Municipal Water District - Template.xlsx;." --add-data="BioMarin Pharmaceutical Inc. Account Allocation - North Marin Water - Template.xlsx;." --add-binary="dependencies/tesseract;tesseract/" --add-binary="dependencies/poppler;poppler/" --hidden-import=pytesseract --hidden-import=pdf2image main.py
 
     - name: Create distribution package
       run: |
@@ -38,6 +54,6 @@ jobs:
     - name: Upload executable
       uses: actions/upload-artifact@v4
       with:
-        name: WaterBillProcessor-Windows-v1.0
+        name: WaterBillProcessor-Windows-v1.0-SelfContained
         path: distribution/
         retention-days: 30

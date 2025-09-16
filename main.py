@@ -3,8 +3,10 @@
 Water Bill PDF Processor - Main Entry Point
 Processes batch PDFs, renames files, and generates Excel reports
 """
+import os
+import sys
 import tkinter as tk
-from shutil import which
+from pathlib import Path
 
 try:
     from tkinterdnd2 import TkinterDnD, DND_FILES
@@ -16,29 +18,85 @@ except Exception:
 
 from gui.main_window import WaterBillProcessorGUI
 
-def check_system_dependencies():
-    """Check for required system dependencies"""
+def setup_bundled_dependencies():
+    """Setup paths for bundled Tesseract and Poppler"""
+    if getattr(sys, 'frozen', False):
+        # Running as PyInstaller bundle
+        bundle_dir = Path(sys._MEIPASS)
+
+        # Set up Tesseract
+        tesseract_path = bundle_dir / 'tesseract' / 'tesseract.exe'
+        if tesseract_path.exists():
+            # Configure pytesseract to use bundled executable
+            try:
+                import pytesseract
+                pytesseract.pytesseract.tesseract_cmd = str(tesseract_path)
+                print(f"Using bundled Tesseract: {tesseract_path}")
+            except ImportError:
+                pass
+
+        # Set up Poppler
+        poppler_path = bundle_dir / 'poppler'
+        if poppler_path.exists():
+            # Add to PATH so pdf2image can find it
+            current_path = os.environ.get('PATH', '')
+            os.environ['PATH'] = str(poppler_path) + os.pathsep + current_path
+            print(f"Using bundled Poppler: {poppler_path}")
+
+    else:
+        # Running from source - use system dependencies
+        print("Running from source - using system dependencies")
+
+def check_dependencies():
+    """Check if dependencies are available (after setup)"""
     missing = []
-    if which("tesseract") is None:
-        missing.append("Tesseract OCR (brew install tesseract / choco install tesseract)")
-    if which("pdftoppm") is None:
-        missing.append("Poppler (brew install poppler / choco install poppler)")
-    if missing:
-        raise RuntimeError("Missing system dependencies:\n- " + "\n- ".join(missing))
+
+    # Test Tesseract
+    try:
+        import pytesseract
+        # Try to get version to test if it works
+        pytesseract.get_tesseract_version()
+        print("Tesseract: Available")
+    except Exception as e:
+        missing.append(f"Tesseract OCR: {str(e)}")
+
+    # Test Poppler
+    try:
+        from pdf2image import convert_from_path
+        # Try to import - this will fail if poppler isn't found
+        print("Poppler: Available")
+    except Exception as e:
+        missing.append(f"Poppler: {str(e)}")
+
+    return missing
 
 def main():
     """Run the application"""
-    try:
-        check_system_dependencies()
-    except RuntimeError as e:
-        print(f"Error: {e}")
-        return 1
+    # Setup bundled dependencies first
+    setup_bundled_dependencies()
 
+    # Check what's available
+    missing_deps = check_dependencies()
+
+    if missing_deps:
+        print("Missing dependencies:")
+        for dep in missing_deps:
+            print(f"  - {dep}")
+        print("Some features may not work correctly.")
+
+    # Start GUI
     root = TkinterDnD.Tk() if DND_OK else tk.Tk()
     app = WaterBillProcessorGUI(root)
+
+    # Show warnings in GUI if dependencies missing
+    if missing_deps and hasattr(app, 'warnings_listbox'):
+        for dep in missing_deps:
+            app.warnings_listbox.insert(tk.END, f"Missing: {dep}")
+        if hasattr(app, 'warnings_frame'):
+            app.warnings_frame.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 10))
+
     root.mainloop()
     return 0
 
 if __name__ == "__main__":
-    import sys
     sys.exit(main())
