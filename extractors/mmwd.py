@@ -37,11 +37,32 @@ class MMWDExtractor(BaseExtractor):
                 total_due = self._extract_currency(text, r'TOTAL DUE:?\s*\$?([\d,]+\.?\d*)')
                 service_address = self._extract_pattern(text, r'Service Address:?\s+(.+?)(?=\n)')
 
-                current_units = (
-                    self._extract_number(text, r'Water Use\s+Units\*?\s+(\d+)') or
-                    self._extract_number(text, r'Units\s*:\s*(\d+)') or 0
-                )
+                current_units = 0
+
+                units_match = re.search(r'Water Use\s+Units\*\s+(\d+)', text, re.IGNORECASE)
+                if units_match:
+                    current_units = int(units_match.group(1))
+                    print(f"DEBUG MMWD: Found units via pattern 1: {current_units}")
+                else:
+                    table_match = re.search(r'(\d+)\s+(\d+(?:\s*1/2)?\")\s+(\d+)\s+(\d+)\s+(\d+)', text)
+                    if table_match:
+                        current_units = int(table_match.group(5))
+                        print(f"DEBUG MMWD: Found units via pattern 2: {current_units}")
+                    else:
+                        lines = text.split('\n')
+                        for i, line in enumerate(lines):
+                            if 'Water Use' in line and i + 2 < len(lines):
+                                if 'Units*' in lines[i + 1]:
+                                    for j in range(i + 2, min(i + 5, len(lines))):
+                                        number_match = re.search(r'^\s*(\d+)\s*$', lines[j].strip())
+                                        if number_match:
+                                            current_units = int(number_match.group(1))
+                                            print(f"DEBUG MMWD: Found units via pattern 3: {current_units}")
+                                            break
+                                    break
+
                 current_usage_gallons = current_units * 748
+                print(f"DEBUG MMWD: Final usage - units: {current_units}, gallons: {current_usage_gallons}")
 
                 start_date, end_date = self._extract_mmwd_meter_read_dates(text)
                 service_period = f"{start_date} - {end_date}" if start_date and end_date else ""

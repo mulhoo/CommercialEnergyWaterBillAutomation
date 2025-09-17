@@ -1,5 +1,5 @@
 """
-Excel template processing functionality
+Excel template processing functionality - DEBUG VERSION
 """
 
 import os
@@ -26,6 +26,30 @@ class ExcelProcessor:
         if value is None:
             return ""
         return re.sub(r"\D", "", str(value))
+    
+    @staticmethod
+    def _is_account_match(bill_account: str, excel_account: str) -> bool:
+        """Check if bill account matches excel account (handles partial matches)"""
+        if not bill_account or not excel_account:
+            return False
+        
+        # Normalize both accounts (remove non-digits)
+        bill_norm = re.sub(r"\D", "", str(bill_account))
+        excel_norm = re.sub(r"\D", "", str(excel_account))
+        
+        # Check exact match first
+        if bill_norm == excel_norm:
+            return True
+        
+        # Check if bill account is contained in excel account (for cases like 495805 in 495805-61362)
+        if bill_norm in excel_norm:
+            return True
+        
+        # Check if excel account is contained in bill account (reverse case)
+        if excel_norm in bill_norm:
+            return True
+        
+        return False
 
     @staticmethod
     def _is_blank(cell) -> bool:
@@ -43,7 +67,6 @@ class ExcelProcessor:
         try:
             template_path = TEMPLATES[district]
             if not os.path.exists(template_path):
-                print(f"Template not found: {template_path}")
                 return None
 
             workbook = load_workbook(template_path)
@@ -53,47 +76,54 @@ class ExcelProcessor:
             start_row = EXCEL_LAYOUT["start_row"]
             account_col = EXCEL_LAYOUT["account_col"]
 
-            acct_to_rows: dict[str, list[int]] = {}
-            for row_num in range(start_row, worksheet.max_row + 1):
-                acct_norm = self._norm_acct(worksheet.cell(row=row_num, column=account_col).value)
-                if acct_norm:
-                    acct_to_rows.setdefault(acct_norm, []).append(row_num)
+            excel_accounts = {}
+            
+            for row_num in range(start_row, min(start_row + 50, worksheet.max_row + 1)):  # Limit to first 50 rows for debugging
+                cell_value = worksheet.cell(row=row_num, column=account_col).value
+                if cell_value:
+                    excel_account = str(cell_value).strip()
+                    excel_accounts[row_num] = excel_account
+
+            if not excel_accounts:
+                for r in range(max(1, start_row-2), start_row+5):
+                    for c in range(max(1, account_col-2), account_col+3):
+                        cell_val = worksheet.cell(row=r, column=c).value
 
             for bill in bills:
-                acct_norm = self._norm_acct(bill.account_number)
-                rows = acct_to_rows.get(acct_norm, [])
-
-                if not rows:
-                    self.last_unmatched.append((bill.account_number, bill.original_filename))
-                    continue
-
                 target_row = None
-                for row_num in rows:
-                    if self._is_blank(worksheet.cell(row=row_num, column=9)):
-                        target_row = row_num
-                        break
+                
+                # Find matching row using improved matching logic
+                for row_num, excel_account in excel_accounts.items():
+                    if self._is_account_match(bill.account_number, excel_account):
+                       if self._is_blank(worksheet.cell(row=row_num, column=9)):
+                            target_row = row_num
+                            break
+
 
                 if target_row is None:
-                    target_row = rows[0]
+                    for row_num, excel_account in excel_accounts.items():
+                        if self._is_account_match(bill.account_number, excel_account):
+                            target_row = row_num
+                            break
 
-                self._populate_row(worksheet, target_row, bill, config)
+                if target_row:
+                    self._populate_row(worksheet, target_row, bill, config)
+                else:
+                    self.last_unmatched.append((bill.account_number, bill.original_filename))
 
-            output_path = self._generate_output_path(district)
+            output_path = self._generate_output_path(district, bills)
             workbook.save(output_path)
-
-            if self.last_unmatched:
-                print("WARNING: No matching account rows for these bills:")
-                for acct, filename in self.last_unmatched:
-                    print(f"  - Account {acct} ({filename})")
 
             return str(output_path)
 
         except Exception as e:
-            print(f"Error generating Excel report: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
     def _populate_row(self, worksheet, row_num: int, bill: BillData, config: dict):
         """Populate a single row with bill data"""
+        
         date_cell = worksheet.cell(row=row_num, column=1)
         if self._is_blank(date_cell):
             try:
@@ -145,13 +175,22 @@ class ExcelProcessor:
             usage_cell.value = gallons
             usage_cell.number_format = '#,##0'
 
-    def _generate_output_path(self, district: str) -> Path:
-        """Generate output path for the Excel report"""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-        district_short = "NMWD" if district == "North Marin" else "MMWD"
-        output_filename = f"BioMarin_{district_short}_Report_{timestamp}.xlsx"
-
+    def _generate_output_path(self, district: str, bills: List[BillData]) -> Path:
+        """Generate output path for the Excel report, replacing existing reports from the same date"""
         reports_dir = REPORTS_DIRS[district]
         reports_dir.mkdir(parents=True, exist_ok=True)
-
-        return reports_dir / output_filename
+        
+        if bills and bills[0].bill_date:
+            try:
+                bill_date = datetime.strptime(bills[0].bill_date, "%m/%d/%Y")
+                date_str = bill_date.strftime("%Y%m%d")
+            except:
+                date_str = datetime.now().strftime("%Y%m%d")
+        else:
+            date_str = datetime.now().strftime("%Y%m%d")
+        
+        district_short = "NMWD" if district == "North Marin" else "MMWD"
+        output_filename = f"BioMarin_{district_short}_Report_{date_str}.xlsx"
+        output_path = reports_dir / output_filename
+        
+        return output_path

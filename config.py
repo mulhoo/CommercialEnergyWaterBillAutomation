@@ -2,28 +2,42 @@
 Configuration constants for Water Bill PDF Processor
 """
 
+import os
 from pathlib import Path
 from calendar import month_name
 from datetime import datetime
 
-# Get the directory where the executable is located
-def get_base_dir():
-    """Get the base directory for the application"""
-    import sys
+# Get the user's Desktop directory
+def get_desktop_dir():
+    """Get the user's Desktop directory - prioritize regular Desktop over OneDrive"""
     import os
+    
+    # Try regular Desktop first (this is what you want)
+    regular_desktop = Path.home() / "Desktop"
+    if regular_desktop.exists():
+        print(f"Using regular Desktop: {regular_desktop}")
+        return regular_desktop
+    
+    # Only fall back to OneDrive if regular Desktop doesn't exist
+    onedrive_desktop = Path.home() / "OneDrive" / "Desktop"
+    if onedrive_desktop.exists():
+        print(f"Using OneDrive Desktop: {onedrive_desktop}")
+        return onedrive_desktop
+    
+    # Other fallbacks
+    userprofile_desktop = Path(os.environ.get('USERPROFILE', '')) / "Desktop" if os.environ.get('USERPROFILE') else None
+    if userprofile_desktop and userprofile_desktop.exists():
+        print(f"Using USERPROFILE Desktop: {userprofile_desktop}")
+        return userprofile_desktop
+    
+    # Last resort - use home directory
+    print(f"Desktop not found, using home: {Path.home()}")
+    return Path.home()
 
-    if getattr(sys, 'frozen', False):
-        # Running as PyInstaller bundle
-        app_dir = Path(sys.executable).parent
-    else:
-        # Running from source
-        app_dir = Path(__file__).parent
-
-    return app_dir
-
-BASE_DIR = get_base_dir() / "Bills"
-REPORTS_ROOT = get_base_dir() / "Reports"
-BILLS_ROOT = BASE_DIR
+DESKTOP = get_desktop_dir()
+BASE_DIR = DESKTOP / "Reports & Bills"
+REPORTS_ROOT = BASE_DIR / "Reports"
+BILLS_ROOT = BASE_DIR / "Bills"
 
 REPORTS_DIRS = {
     "North Marin": REPORTS_ROOT / "North Marin",

@@ -1,5 +1,5 @@
 """
-Main GUI window for Water Bill PDF Processor
+Main GUI window for Water Bill PDF Processor - Windows Optimized
 """
 
 import os
@@ -25,74 +25,108 @@ class WaterBillProcessorGUI:
     """Main GUI application for water bill processing"""
 
     def __init__(self, root):
-            self.root = root
-            self.root.title("Commercial Energy Water Bill PDF Processor")
+        self.root = root
+        self.root.title("Commercial Energy Water Bill PDF Processor")
 
-            sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
-            w = max(1000, int(sw * 0.65))
-            h = max(720, int(sh * 0.70))
-            self.root.geometry(f"{w}x{h}")
-            self.root.minsize(1000, 720)
+        # Configure window
+        sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        w = max(1200, int(sw * 0.75))
+        h = max(800, int(sh * 0.80))
+        self.root.geometry(f"{w}x{h}")
+        self.root.minsize(1200, 800)
+        
+        # Set window colors for better Windows appearance
+        self.root.configure(bg="#f0f0f0")
 
-            self.nmwd_extractor = NMWDExtractor()
-            self.mmwd_extractor = MMWDExtractor()
-            self.renamer = FileRenamer()
-            self.excel_processor = ExcelProcessor()
+        # Initialize processors
+        self.nmwd_extractor = NMWDExtractor()
+        self.mmwd_extractor = MMWDExtractor()
+        self.renamer = FileRenamer()
+        self.excel_processor = ExcelProcessor()
 
-            self.selected_files = []
-            self._processing = False
-            self._dialog_open = False
-            self._last_dir = None
+        # Initialize state
+        self.selected_files = []
+        self._processing = False
+        self._dialog_open = False
+        self._last_dir = None
 
-            # Create directories when needed, not on import
-            from config import ensure_directories
-            try:
-                ensure_directories()
-            except Exception as e:
-                print(f"Warning: Could not create directories: {e}")
+        # Create directories when needed
+        try:
+            ensure_directories()
+        except Exception as e:
+            print(f"Warning: Could not create directories: {e}")
 
-            self.setup_gui()
+        self.setup_gui()
 
     def setup_gui(self):
-        """Setup the GUI components"""
-        main_frame = ttk.Frame(self.root, padding="10")
+        """Setup the GUI components with Windows-optimized styling"""
+        # Configure overall styling for Windows
+        style = ttk.Style()
+        style.theme_use('vista')  # Better theme for Windows
+        
+        # Configure custom styles
+        style.configure("Title.TLabel", font=("Arial", 18, "bold"), foreground="#2c3e50")
+        style.configure("Status.TLabel", font=("Arial", 11, "bold"), background="#ffffff")
+        
+        main_frame = ttk.Frame(self.root, padding="15")  # Reduced from 20
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
 
         # Title
-        title_label = ttk.Label(main_frame, text="Water Bill PDF Processor",
-                               font=("Arial", 16, "bold"))
-        title_label.grid(row=0, column=0, columnspan=3, pady=(0, 20))
+        title_label = ttk.Label(
+            main_frame, 
+            text="Water Bill PDF Processor",
+            style="Title.TLabel"
+        )
+        title_label.grid(row=0, column=0, columnspan=3, pady=(0, 15))  # Reduced from 25
 
         # District selection
-        district_frame = ttk.LabelFrame(main_frame, text="Select District", padding="10")
-        district_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 10))
+        district_frame = ttk.LabelFrame(main_frame, text="Select District", padding="10")  # Reduced from 15
+        district_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 10))  # Reduced from 15
 
         self.district_var = tk.StringVar(value="North Marin")
         ttk.Radiobutton(
             district_frame, text="North Marin Water District",
             variable=self.district_var, value="North Marin"
-        ).grid(row=0, column=0, sticky=tk.W, padx=(0, 50))
+        ).grid(row=0, column=0, sticky=tk.W, padx=(0, 60))
         ttk.Radiobutton(
             district_frame, text="Marin Municipal Water District",
             variable=self.district_var, value="Marin Municipal"
         ).grid(row=0, column=1, sticky=tk.W)
 
         # File Processing frame
-        file_frame = ttk.LabelFrame(main_frame, text="File Processing", padding="10")
-        file_frame.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 10))
+        file_frame = ttk.LabelFrame(main_frame, text="File Processing", padding="10")  # Reduced from 15
+        file_frame.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 10))  # Reduced from 15
         file_frame.columnconfigure(0, weight=1)
 
-        # Drop Zone
+        # Drop Zone with improved Windows styling - made more compact
         self.drop_zone = tk.Label(
             file_frame,
-            text="⬇️  Drop PDF files here\n(or click to select)",
-            bd=1, relief="solid", anchor="center",
-            font=("Arial", 13), height=6, cursor="hand2",
-            fg="#666666"
+            text="⬇  Drop PDF files here (or click to select)",
+            bd=2, 
+            relief="groove",
+            anchor="center",
+            font=("Arial", 12, "bold"),
+            height=3,  # Reduced from 6 to 3
+            cursor="hand2",
+            fg="#555555",
+            bg="#f8f9fa",
+            highlightbackground="#2196F3",
+            highlightcolor="#1976D2",
+            highlightthickness=1
         )
-        self.drop_zone.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(15, 15))
+        self.drop_zone.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(10, 10))  # Reduced from (15, 15)
         self.drop_zone.bind("<Button-1>", lambda e: self.select_files())
 
+        # Hover effects for drop zone
+        def on_enter(e):
+            self.drop_zone.config(bg="#e3f2fd", highlightthickness=2)
+        def on_leave(e):
+            self.drop_zone.config(bg="#f8f9fa", highlightthickness=1)
+        
+        self.drop_zone.bind("<Enter>", on_enter)
+        self.drop_zone.bind("<Leave>", on_leave)
+
+        # Setup drag and drop
         if DND_OK:
             try:
                 self.drop_zone.drop_target_register(DND_FILES)
@@ -100,54 +134,76 @@ class WaterBillProcessorGUI:
             except Exception as e:
                 print(f"DnD setup failed: {e}")
 
-        if DND_OK and hasattr(self.drop_zone, "drop_target_register"):
-            self.drop_zone.drop_target_register(DND_FILES)
-            self.drop_zone.dnd_bind("<<Drop>>", self._on_drop)
-
         # Status banner and Process button
         status_frame = ttk.Frame(main_frame)
-        status_frame.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(6, 6))
+        status_frame.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 10))
 
         self.status_var = tk.StringVar(value="No files selected")
-        status_style = ttk.Style()
-        status_style.configure("Status.TLabel", font=("Arial", 11, "bold"))
-        status_bar = ttk.Label(status_frame, textvariable=self.status_var, style="Status.TLabel",
-                              anchor=tk.W, padding=(8, 6, 8, 6))
-        status_bar.grid(row=0, column=0, sticky=(tk.W, tk.E))
+        
+        # Status label with better styling
+        self.status_label = tk.Label(
+            status_frame,
+            textvariable=self.status_var,
+            font=("Arial", 11, "bold"),
+            anchor=tk.W,
+            bg="#ffffff",
+            fg="#333333",
+            relief="sunken",
+            bd=1,
+            padx=10,
+            pady=8
+        )
+        self.status_label.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 10))
 
-        self.process_btn = ttk.Button(status_frame, text="Process Files", command=self.process_files)
-        self.process_btn.grid(row=0, column=1, padx=(10, 0))
+        # Process button with better styling
+        self.process_btn = tk.Button(
+            status_frame, 
+            text="Process Files",
+            font=("Arial", 11, "bold"),
+            bg="#4CAF50",
+            fg="white",
+            relief="raised",
+            bd=2,
+            padx=20,
+            pady=8,
+            cursor="hand2",
+            command=self.process_files
+        )
+        self.process_btn.grid(row=0, column=1)
 
         status_frame.columnconfigure(0, weight=1)
 
-        # Warnings
-        warnings_frame = ttk.LabelFrame(main_frame, text="Processing Warnings", padding="10")
-        self.warnings_frame = warnings_frame
-
-        # Warning listbox
+        # Warnings frame
+        self.warnings_frame = ttk.LabelFrame(main_frame, text="Processing Warnings", padding="10")
         self.warnings_listbox = tk.Listbox(
-            warnings_frame, height=3,
-            fg="orange", selectmode=tk.SINGLE
+            self.warnings_frame, height=3,
+            fg="#ff6600", selectmode=tk.SINGLE,
+            font=("Arial", 9)
         )
-        warnings_scroll = ttk.Scrollbar(warnings_frame, orient=tk.VERTICAL,
+        warnings_scroll = ttk.Scrollbar(self.warnings_frame, orient=tk.VERTICAL,
                                       command=self.warnings_listbox.yview)
         self.warnings_listbox.configure(yscrollcommand=warnings_scroll.set)
 
         self.warnings_listbox.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         warnings_scroll.grid(row=0, column=1, sticky=(tk.N, tk.S))
 
-        warnings_frame.columnconfigure(0, weight=1)
-        warnings_frame.rowconfigure(0, weight=1)
+        self.warnings_frame.columnconfigure(0, weight=1)
+        self.warnings_frame.rowconfigure(0, weight=1)
 
-        # Selected files (initially hidden)
-        self.selected_frame = ttk.LabelFrame(main_frame, text="Selected Files", padding="10")
+        # Selected files frame (initially hidden) - made more compact
+        self.selected_frame = ttk.LabelFrame(main_frame, text="Selected Files", padding="8")
         self.files_listbox = tk.Listbox(
-            self.selected_frame, height=6, activestyle="dotbox",
-            exportselection=False, selectmode=tk.EXTENDED
+            self.selected_frame, height=4, activestyle="dotbox",  # Reduced from 6 to 4
+            exportselection=False, selectmode=tk.EXTENDED,
+            font=("Arial", 9)
         )
+        
         if DND_OK and hasattr(self.files_listbox, "drop_target_register"):
-            self.files_listbox.drop_target_register(DND_FILES)
-            self.files_listbox.dnd_bind("<<Drop>>", self._on_drop)
+            try:
+                self.files_listbox.drop_target_register(DND_FILES)
+                self.files_listbox.dnd_bind("<<Drop>>", self._on_drop)
+            except:
+                pass
 
         files_scroll = ttk.Scrollbar(self.selected_frame, orient=tk.VERTICAL, command=self.files_listbox.yview)
         self.files_listbox.configure(yscrollcommand=files_scroll.set)
@@ -155,64 +211,99 @@ class WaterBillProcessorGUI:
         self.files_listbox.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         files_scroll.grid(row=0, column=1, sticky=(tk.N, tk.S))
 
-        remove_btn = ttk.Button(self.selected_frame, text="✕", width=3, command=self.remove_selected_files)
-        remove_btn.grid(row=0, column=2, padx=(6, 0), sticky=tk.N)
+        # Remove button with better styling
+        self.remove_btn = tk.Button(
+            self.selected_frame, 
+            text="✕",
+            font=("Arial", 10, "bold"),
+            bg="#f44336",
+            fg="white",
+            width=3,
+            relief="raised",
+            bd=1,
+            cursor="hand2",
+            command=self.remove_selected_files
+        )
+        self.remove_btn.grid(row=0, column=2, padx=(6, 0), sticky=tk.N)
 
         self.selected_frame.columnconfigure(0, weight=1)
         self.selected_frame.rowconfigure(0, weight=1)
 
+        # Bind events
         self.files_listbox.bind("<Double-1>", self._on_file_double_click)
         self.files_listbox.bind("<Delete>", lambda e: self.remove_selected_files())
         self.files_listbox.bind("<BackSpace>", lambda e: self.remove_selected_files())
 
-        # Results
-        results_frame = ttk.LabelFrame(main_frame, text="Processing Results", padding="10")
-        results_frame.grid(row=5, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
+        # Results frame
+        self.results_frame = ttk.LabelFrame(main_frame, text="Processing Results", padding="10")
+        self.results_frame.grid(row=5, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
 
-        # Clear button at top-right
-        style = ttk.Style()
-        style.configure("Clear.TButton", padding=6, relief="flat", borderwidth=0,
-                        background="#e57373", foreground="white")
-        self.clear_btn = ttk.Button(results_frame, text="Clear",
-                                    style="Clear.TButton", command=self.clear_round)
-        self.clear_btn.grid(row=0, column=1, sticky=tk.E, pady=(0, 10))
+        # Clear button with proper Windows styling - simplified positioning
+        self.clear_btn = tk.Button(
+            self.results_frame, 
+            text="Clear",
+            bg="#d32f2f",
+            fg="white",
+            font=("Arial", 10, "bold"),
+            relief="raised",
+            borderwidth=2,
+            padx=15,
+            pady=5,
+            cursor="hand2",
+            command=self.clear_round
+        )
+        self.clear_btn.grid(row=0, column=1, sticky=tk.E, pady=(0, 10), padx=(0, 5))
 
-        # Treeview and scrollbar
+        # Treeview with guaranteed scrollbar - simplified approach
         columns = (
             "Original File", "Renamed File", "Account", "Statement Date",
             "Bill Start", "Bill End", "Usage (gal)", "Amount", "Status",
         )
-        self.results_tree = ttk.Treeview(results_frame, columns=columns, show="headings", height=15)
+        
+        # Set fixed height to ensure scrollbar appears when needed
+        self.results_tree = ttk.Treeview(self.results_frame, columns=columns, show="headings", height=8)
+        
+        # Configure column headings and widths
         for col in columns:
             self.results_tree.heading(col, text=col)
 
-        self.results_tree.column("Original File", width=180)
-        self.results_tree.column("Renamed File", width=180)
-        self.results_tree.column("Account", width=110)
-        self.results_tree.column("Statement Date", width=110)
-        self.results_tree.column("Bill Start", width=100)
-        self.results_tree.column("Bill End", width=100)
-        self.results_tree.column("Usage (gal)", width=110)
-        self.results_tree.column("Amount", width=100)
-        self.results_tree.column("Status", width=90)
+        self.results_tree.column("Original File", width=180, minwidth=120)
+        self.results_tree.column("Renamed File", width=180, minwidth=120)
+        self.results_tree.column("Account", width=100, minwidth=80)
+        self.results_tree.column("Statement Date", width=110, minwidth=90)
+        self.results_tree.column("Bill Start", width=90, minwidth=70)
+        self.results_tree.column("Bill End", width=90, minwidth=70)
+        self.results_tree.column("Usage (gal)", width=100, minwidth=80)
+        self.results_tree.column("Amount", width=90, minwidth=70)
+        self.results_tree.column("Status", width=80, minwidth=60)
 
-        scrollbar = ttk.Scrollbar(results_frame, orient=tk.VERTICAL, command=self.results_tree.yview)
-        self.results_tree.configure(yscrollcommand=scrollbar.set)
+        # Configure treeview styling
+        style.configure("Treeview", 
+                       font=("Arial", 9),
+                       rowheight=25)
+        style.configure("Treeview.Heading", 
+                       font=("Arial", 10, "bold"),
+                       background="#e0e0e0")
 
-        self.results_tree.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S))
-        scrollbar.grid(row=1, column=2, sticky=(tk.N, tk.S))
+        # Create and configure scrollbar
+        tree_scrollbar = ttk.Scrollbar(self.results_frame, orient=tk.VERTICAL, command=self.results_tree.yview)
+        self.results_tree.configure(yscrollcommand=tree_scrollbar.set)
 
-        # Layout weights
+        # Grid the treeview and scrollbar
+        self.results_tree.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 5))
+        tree_scrollbar.grid(row=1, column=2, sticky=(tk.N, tk.S))
+
+        # Configure layout weights properly
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
 
         main_frame.columnconfigure(0, weight=1)
         main_frame.rowconfigure(5, weight=1)
 
-        results_frame.columnconfigure(0, weight=1, minsize=800)
-        results_frame.columnconfigure(1, weight=0)
-        results_frame.columnconfigure(2, weight=0)
-        results_frame.rowconfigure(1, weight=1, minsize=280)
+        self.results_frame.columnconfigure(0, weight=1)
+        self.results_frame.columnconfigure(1, weight=0)
+        self.results_frame.columnconfigure(2, weight=0)
+        self.results_frame.rowconfigure(1, weight=1)
 
     def select_files(self):
         """Append newly chosen PDFs to the current selection"""
@@ -304,16 +395,26 @@ class WaterBillProcessorGUI:
         self._update_selected_status()
 
     def set_buttons_enabled(self, enabled: bool):
-        """Enable/disable buttons during processing"""
+        """Enable/disable buttons during processing with proper styling"""
         state = tk.NORMAL if enabled else tk.DISABLED
+        
         self.process_btn.configure(state=state)
         self.clear_btn.configure(state=state)
+        
+        # Update colors when disabled
+        if enabled:
+            self.process_btn.config(bg="#4CAF50", fg="white")
+            self.clear_btn.config(bg="#d32f2f", fg="white")
+        else:
+            self.process_btn.config(bg="#cccccc", fg="#666666")
+            self.clear_btn.config(bg="#cccccc", fg="#666666")
 
     def clear_round(self):
         """Clear all results and selected files"""
         self.results_tree.delete(*self.results_tree.get_children())
         self.selected_files = []
-        self.files_listbox.delete(0, tk.END)
+        if hasattr(self, 'files_listbox'):
+            self.files_listbox.delete(0, tk.END)
         self.status_var.set("Ready to process files")
         if hasattr(self, "selected_frame") and self.selected_frame.winfo_ismapped():
             self.selected_frame.grid_remove()
@@ -508,7 +609,7 @@ class WaterBillProcessorGUI:
                     success_message += f"Excel report: {os.path.basename(excel_path)}\n"
                     success_message += f"Renamed PDFs in: {BASE_DIR / 'Bills' / selected_district / month_folder}"
                     if warnings:
-                        success_message += f"\n\n⚠️ {len(warnings)} warning(s) - see warnings panel below"
+                        success_message += f"\n\n⚠ {len(warnings)} warning(s) - see warnings panel below"
 
                     messagebox.showinfo("Success", success_message)
                 else:
@@ -521,12 +622,12 @@ class WaterBillProcessorGUI:
                                       sticky=(tk.W, tk.E), pady=(0, 10))
                 if hasattr(self, "selected_frame") and self.selected_frame.winfo_ismapped():
                     self.selected_frame.grid_configure(row=5)
-                results_frame = self.results_tree.master
-                results_frame.grid_configure(row=6)
+                # Use the instance variable
+                self.results_frame.grid_configure(row=6)
             else:
                 self.warnings_frame.grid_remove()
-                results_frame = self.results_tree.master
-                results_frame.grid_configure(row=5)
+                # Use the instance variable
+                self.results_frame.grid_configure(row=5)
 
         finally:
             self._processing = False
