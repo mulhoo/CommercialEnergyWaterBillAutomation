@@ -101,11 +101,11 @@ class WaterBillProcessorGUI:
         # Drop Zone with improved Windows styling - made more compact
         self.drop_zone = tk.Label(
             file_frame,
-            text="⬇  Drop PDF files here (or click to select)",
+            text="⬇  Drop PDF files here (or click to select)\nFor Outlook: Save attachments first, then drag from folder",
             bd=2, 
             relief="groove",
             anchor="center",
-            font=("Arial", 12, "bold"),
+            font=("Arial", 11, "bold"),
             height=3,  # Reduced from 6 to 3
             cursor="hand2",
             fg="#555555",
@@ -331,8 +331,8 @@ class WaterBillProcessorGUI:
             )
 
             if chosen:
-                existing = set(map(os.path.abspath, self.selected_files))
-                added = [os.path.abspath(p) for p in chosen if os.path.abspath(p) not in existing]
+                # Add all chosen files without deduplication
+                added = [os.path.abspath(p) for p in chosen]
                 if added:
                     self.selected_files.extend(added)
                     self._last_dir = os.path.dirname(added[0])
@@ -353,35 +353,79 @@ class WaterBillProcessorGUI:
             self._dialog_open = False
 
     def _on_drop(self, event):
-        """Accept dropped PDFs and optional folders"""
+        """Accept dropped PDFs and optional folders - enhanced for Outlook compatibility"""
         paths = []
         try:
+            # Try to split the data - handles regular file drops
             paths = list(self.root.tk.splitlist(event.data))
         except Exception:
+            # Fallback for single items or special formats
             paths = [event.data]
 
         to_add = []
+        outlook_temp_files = []
+        
         for p in paths:
+            # Handle file:// URLs
             if p.startswith("file://"):
                 p = unquote(urlparse(p).path)
+                # Fix Windows path issues from file:// URLs
+                if p.startswith('/') and ':' in p:
+                    p = p[1:]  # Remove leading slash for Windows paths like /C:/...
 
             p = os.path.abspath(p)
 
+            # Check if it's a directory
             if os.path.isdir(p):
                 for name in os.listdir(p):
                     if name.lower().endswith(".pdf"):
                         to_add.append(os.path.abspath(os.path.join(p, name)))
-            else:
-                if p.lower().endswith(".pdf"):
+            elif p.lower().endswith(".pdf"):
+                # Check if this might be an Outlook temp file
+                if "outlook" in p.lower() or "tmp" in p.lower() or "temp" in p.lower():
+                    # Copy Outlook temp files to a permanent location
+                    try:
+                        import shutil
+                        import tempfile
+                        
+                        # Create a temp directory for Outlook files
+                        temp_dir = tempfile.mkdtemp(prefix="outlook_pdfs_")
+                        original_name = os.path.basename(p)
+                        if not original_name or original_name.startswith('~'):
+                            # Generate a name if Outlook gives us a temp name
+                            original_name = f"outlook_attachment_{len(outlook_temp_files)+1}.pdf"
+                        
+                        permanent_path = os.path.join(temp_dir, original_name)
+                        shutil.copy2(p, permanent_path)
+                        to_add.append(permanent_path)
+                        outlook_temp_files.append(permanent_path)
+                        print(f"Copied Outlook attachment: {p} -> {permanent_path}")
+                    except Exception as e:
+                        print(f"Failed to copy Outlook attachment: {e}")
+                        # Try to use the original path anyway
+                        to_add.append(p)
+                else:
                     to_add.append(p)
 
-        existing = set(map(os.path.abspath, self.selected_files))
-        added = [p for p in to_add if os.path.abspath(p) not in existing]
-        if not added:
+        if not to_add:
+            if paths:
+                # Show a helpful message if drag and drop failed
+                messagebox.showinfo("Drag and Drop", 
+                    "No PDF files detected. If dragging from Outlook:\n\n"
+                    "1. Save attachments to a folder first\n"
+                    "2. Then drag from that folder\n\n"
+                    "Or use the 'click to select' option instead.")
             return
 
-        self.selected_files.extend(added)
-        self._last_dir = os.path.dirname(added[0])
+        self.selected_files.extend(to_add)
+        if to_add:
+            self._last_dir = os.path.dirname(to_add[0])
+
+        # Store outlook temp files for cleanup later
+        if outlook_temp_files:
+            if not hasattr(self, '_outlook_temp_files'):
+                self._outlook_temp_files = []
+            self._outlook_temp_files.extend(outlook_temp_files)
 
         if hasattr(self, "selected_frame") and not self.selected_frame.winfo_ismapped():
             self.selected_frame.grid(row=4, column=0, columnspan=3,

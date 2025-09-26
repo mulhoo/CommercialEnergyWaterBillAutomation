@@ -3,6 +3,7 @@ Configuration constants for Water Bill PDF Processor
 """
 
 import os
+import sys
 from pathlib import Path
 from calendar import month_name
 from datetime import datetime
@@ -34,6 +35,15 @@ def get_desktop_dir():
     print(f"Desktop not found, using home: {Path.home()}")
     return Path.home()
 
+def get_base_dir():
+    """Get the directory where the executable/script is located"""
+    if getattr(sys, 'frozen', False):
+        # Running as PyInstaller bundle
+        return Path(sys.executable).parent
+    else:
+        # Running from source
+        return Path(__file__).parent
+
 DESKTOP = get_desktop_dir()
 BASE_DIR = DESKTOP / "Reports & Bills"
 REPORTS_ROOT = BASE_DIR / "Reports"
@@ -49,9 +59,22 @@ BILLS_DIRS = {
     "Marin Municipal": BILLS_ROOT / "Marin Municipal",
 }
 
+# Template paths - handle both bundled and development environments
+def get_template_path(filename):
+    """Get the full path to a template file"""
+    base_dir = get_base_dir()
+    template_path = base_dir / filename
+    
+    if template_path.exists():
+        print(f"Found template: {template_path}")
+        return str(template_path)
+    else:
+        print(f"Template not found: {template_path}")
+        return filename  # Fallback to relative path
+
 TEMPLATES = {
-    "North Marin": "BioMarin Pharmaceutical Inc. Account Allocation - North Marin Water - Template.xlsx",
-    "Marin Municipal": "BioMarin Pharmaceutical Inc. Account Allocation - Marin Municipal Water District - Template.xlsx",
+    "North Marin": get_template_path("BioMarin Pharmaceutical Inc. Account Allocation - North Marin Water - Template.xlsx"),
+    "Marin Municipal": get_template_path("BioMarin Pharmaceutical Inc. Account Allocation - Marin Municipal Water District - Template.xlsx"),
 }
 
 DISTRICT_CONFIG = {
