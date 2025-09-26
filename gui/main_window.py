@@ -19,7 +19,7 @@ from extractors.nmwd import NMWDExtractor
 from extractors.mmwd import MMWDExtractor
 from processors.file_renamer import FileRenamer
 from processors.excel_processor import ExcelProcessor
-from config import BASE_DIR, BILLS_DIRS, month_year_folder, ensure_directories
+from config import BILLS_DIRS, month_year_folder, ensure_directories
 
 class WaterBillProcessorGUI:
     """Main GUI application for water bill processing"""
@@ -601,7 +601,7 @@ class WaterBillProcessorGUI:
                         district_bills_dir = BILLS_DIRS[selected_district] / month_folder
                         district_bills_dir.mkdir(parents=True, exist_ok=True)
 
-                        new_path = self.renamer.rename_file(file_path, new_filename, str(district_bills_dir))
+                        new_path = self.renamer.rename_file(file_path, bill_data)
 
                         self.results_tree.insert(
                             "", "end",
@@ -651,7 +651,7 @@ class WaterBillProcessorGUI:
 
                     success_message = "Processing complete!\n\n"
                     success_message += f"Excel report: {os.path.basename(excel_path)}\n"
-                    success_message += f"Renamed PDFs in: {BASE_DIR / 'Bills' / selected_district / month_folder}"
+                    success_message += f"Renamed PDFs in: {BILLS_DIRS[selected_district] / month_folder}"
                     if warnings:
                         success_message += f"\n\n⚠ {len(warnings)} warning(s) - see warnings panel below"
 

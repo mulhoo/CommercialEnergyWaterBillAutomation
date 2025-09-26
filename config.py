@@ -1,80 +1,29 @@
 """
 Configuration constants for Water Bill PDF Processor
 """
-
 import os
-import sys
 from pathlib import Path
 from calendar import month_name
 from datetime import datetime
 
-# Get the user's Desktop directory
-def get_desktop_dir():
-    """Get the user's Desktop directory - prioritize regular Desktop over OneDrive"""
-    import os
-    
-    # Try regular Desktop first (this is what you want)
-    regular_desktop = Path.home() / "Desktop"
-    if regular_desktop.exists():
-        print(f"Using regular Desktop: {regular_desktop}")
-        return regular_desktop
-    
-    # Only fall back to OneDrive if regular Desktop doesn't exist
-    onedrive_desktop = Path.home() / "OneDrive" / "Desktop"
-    if onedrive_desktop.exists():
-        print(f"Using OneDrive Desktop: {onedrive_desktop}")
-        return onedrive_desktop
-    
-    # Other fallbacks
-    userprofile_desktop = Path(os.environ.get('USERPROFILE', '')) / "Desktop" if os.environ.get('USERPROFILE') else None
-    if userprofile_desktop and userprofile_desktop.exists():
-        print(f"Using USERPROFILE Desktop: {userprofile_desktop}")
-        return userprofile_desktop
-    
-    # Last resort - use home directory
-    print(f"Desktop not found, using home: {Path.home()}")
-    return Path.home()
-
-def get_base_dir():
-    """Get the directory where the executable/script is located"""
-    if getattr(sys, 'frozen', False):
-        # Running as PyInstaller bundle
-        return Path(sys.executable).parent
-    else:
-        # Running from source
-        return Path(__file__).parent
-
-DESKTOP = get_desktop_dir()
-BASE_DIR = DESKTOP / "Reports & Bills"
-REPORTS_ROOT = BASE_DIR / "Reports"
-BILLS_ROOT = BASE_DIR / "Bills"
-
-REPORTS_DIRS = {
-    "North Marin": REPORTS_ROOT / "North Marin",
-    "Marin Municipal": REPORTS_ROOT / "Marin Municipal",
-}
+# Network drive base paths
+BIOMARIN_BASE = Path("X:/Sales/Customers/Current Clients/B/BioMarin Pharmaceuticals/BioMarin Billing agreement/Payment Schedules")
+BILLS_ROOT = BIOMARIN_BASE / "Utility Bills"
+REPORTS_ROOT = BIOMARIN_BASE / "Pending Invoice"
 
 BILLS_DIRS = {
-    "North Marin": BILLS_ROOT / "North Marin",
-    "Marin Municipal": BILLS_ROOT / "Marin Municipal",
+    "North Marin": BILLS_ROOT / "North Marin Water District",
+    "Marin Municipal": BILLS_ROOT / "Marin Water",
 }
 
-# Template paths - handle both bundled and development environments
-def get_template_path(filename):
-    """Get the full path to a template file"""
-    base_dir = get_base_dir()
-    template_path = base_dir / filename
-    
-    if template_path.exists():
-        print(f"Found template: {template_path}")
-        return str(template_path)
-    else:
-        print(f"Template not found: {template_path}")
-        return filename  # Fallback to relative path
+REPORTS_DIRS = {
+    "North Marin": REPORTS_ROOT,
+    "Marin Municipal": REPORTS_ROOT,
+}
 
 TEMPLATES = {
-    "North Marin": get_template_path("BioMarin Pharmaceutical Inc. Account Allocation - North Marin Water - Template.xlsx"),
-    "Marin Municipal": get_template_path("BioMarin Pharmaceutical Inc. Account Allocation - Marin Municipal Water District - Template.xlsx"),
+    "North Marin": "BioMarin Pharmaceutical Inc. Account Allocation - North Marin Water - Template.xlsx",
+    "Marin Municipal": "BioMarin Pharmaceutical Inc. Account Allocation - Marin Municipal Water District - Template.xlsx",
 }
 
 DISTRICT_CONFIG = {
@@ -106,16 +55,55 @@ def month_year_folder(bill_date_str: str) -> str:
         dt = datetime.now()
     return f"{month_name[dt.month]} {dt.year}"
 
+def check_network_access():
+    """Check if the X: drive is accessible"""
+    try:
+        if BIOMARIN_BASE.exists():
+            print(f"Network drive accessible: {BIOMARIN_BASE}")
+            return True
+        else:
+            print(f"Warning: Network drive not accessible: {BIOMARIN_BASE}")
+            return False
+    except Exception as e:
+        print(f"Error accessing network drive: {e}")
+        return False
+
 def ensure_directories():
     """Create directories if they don't exist - call this when needed, not on import"""
     try:
-        BASE_DIR.mkdir(exist_ok=True)
-        REPORTS_ROOT.mkdir(exist_ok=True)
-        for dir_path in REPORTS_DIRS.values():
-            dir_path.mkdir(parents=True, exist_ok=True)
+        if not check_network_access():
+            print("Cannot create directories - network drive not accessible")
+            return False
+
+        BILLS_ROOT.mkdir(parents=True, exist_ok=True)
         for dir_path in BILLS_DIRS.values():
             dir_path.mkdir(parents=True, exist_ok=True)
+            print(f"Created/verified bills directory: {dir_path}")
+
+        # Create the reports directory
+        REPORTS_ROOT.mkdir(parents=True, exist_ok=True)
+        print(f"Created/verified reports directory: {REPORTS_ROOT}")
+
         return True
-    except Exception as e:
-        print(f"Warning: Could not create directories: {e}")
+    except PermissionError as e:
+        print(f"Permission error: Cannot create directories: {e}")
         return False
+    except Exception as e:
+        print(f"Error: Could not create directories: {e}")
+        return False
+
+def get_fallback_dirs():
+    """Get local fallback directories if network drive is unavailable"""
+    desktop = Path.home() / "Desktop" / "BioMarin_Backup"
+
+    fallback_bills = {
+        "North Marin": desktop / "Bills" / "North Marin Water District",
+        "Marin Municipal": desktop / "Bills" / "Marin Water",
+    }
+
+    fallback_reports = {
+        "North Marin": desktop / "Reports",
+        "Marin Municipal": desktop / "Reports",
+    }
+
+    return fallback_bills, fallback_reports

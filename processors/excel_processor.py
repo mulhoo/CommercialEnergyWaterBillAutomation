@@ -26,29 +26,29 @@ class ExcelProcessor:
         if value is None:
             return ""
         return re.sub(r"\D", "", str(value))
-    
+
     @staticmethod
     def _is_account_match(bill_account: str, excel_account: str) -> bool:
         """Check if bill account matches excel account (handles partial matches)"""
         if not bill_account or not excel_account:
             return False
-        
+
         # Normalize both accounts (remove non-digits)
         bill_norm = re.sub(r"\D", "", str(bill_account))
         excel_norm = re.sub(r"\D", "", str(excel_account))
-        
+
         # Check exact match first
         if bill_norm == excel_norm:
             return True
-        
+
         # Check if bill account is contained in excel account (for cases like 495805 in 495805-61362)
         if bill_norm in excel_norm:
             return True
-        
+
         # Check if excel account is contained in bill account (reverse case)
         if excel_norm in bill_norm:
             return True
-        
+
         return False
 
     @staticmethod
@@ -77,8 +77,8 @@ class ExcelProcessor:
             account_col = EXCEL_LAYOUT["account_col"]
 
             excel_accounts = {}
-            
-            for row_num in range(start_row, min(start_row + 50, worksheet.max_row + 1)):  # Limit to first 50 rows for debugging
+
+            for row_num in range(start_row, min(start_row + 50, worksheet.max_row + 1)):
                 cell_value = worksheet.cell(row=row_num, column=account_col).value
                 if cell_value:
                     excel_account = str(cell_value).strip()
@@ -91,8 +91,7 @@ class ExcelProcessor:
 
             for bill in bills:
                 target_row = None
-                
-                # Find matching row using improved matching logic
+
                 for row_num, excel_account in excel_accounts.items():
                     if self._is_account_match(bill.account_number, excel_account):
                        if self._is_blank(worksheet.cell(row=row_num, column=9)):
@@ -123,7 +122,7 @@ class ExcelProcessor:
 
     def _populate_row(self, worksheet, row_num: int, bill: BillData, config: dict):
         """Populate a single row with bill data"""
-        
+
         date_cell = worksheet.cell(row=row_num, column=1)
         if self._is_blank(date_cell):
             try:
@@ -179,18 +178,11 @@ class ExcelProcessor:
         """Generate output path for the Excel report, replacing existing reports from the same date"""
         reports_dir = REPORTS_DIRS[district]
         reports_dir.mkdir(parents=True, exist_ok=True)
-        
-        if bills and bills[0].bill_date:
-            try:
-                bill_date = datetime.strptime(bills[0].bill_date, "%m/%d/%Y")
-                date_str = bill_date.strftime("%Y%m%d")
-            except:
-                date_str = datetime.now().strftime("%Y%m%d")
-        else:
-            date_str = datetime.now().strftime("%Y%m%d")
-        
-        district_short = "NMWD" if district == "North Marin" else "MMWD"
-        output_filename = f"BioMarin_{district_short}_Report_{date_str}.xlsx"
+
+        if district == "North Marin":
+            output_filename = "BioMarin Pharmaceutical Inc. Account Allocation - North Marin Water.xlsx"
+        else:  # Marin Municipal
+            output_filename = "BioMarin Pharmaceutical Inc. Account Allocation - Marin Municipal Water District.xlsx"
         output_path = reports_dir / output_filename
-        
+
         return output_path

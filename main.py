@@ -21,13 +21,10 @@ from gui.main_window import WaterBillProcessorGUI
 def setup_bundled_dependencies():
     """Setup paths for bundled Tesseract and Poppler"""
     if getattr(sys, 'frozen', False):
-        # Running as PyInstaller bundle
         bundle_dir = Path(sys._MEIPASS)
 
-        # Set up Tesseract
         tesseract_path = bundle_dir / 'tesseract' / 'tesseract.exe'
         if tesseract_path.exists():
-            # Configure pytesseract to use bundled executable
             try:
                 import pytesseract
                 pytesseract.pytesseract.tesseract_cmd = str(tesseract_path)
@@ -35,16 +32,13 @@ def setup_bundled_dependencies():
             except ImportError:
                 pass
 
-        # Set up Poppler
         poppler_path = bundle_dir / 'poppler'
         if poppler_path.exists():
-            # Add to PATH so pdf2image can find it
             current_path = os.environ.get('PATH', '')
             os.environ['PATH'] = str(poppler_path) + os.pathsep + current_path
             print(f"Using bundled Poppler: {poppler_path}")
 
     else:
-        # Running from source - use system dependencies
         print("Running from source - using system dependencies")
 
 def check_dependencies():
@@ -72,10 +66,8 @@ def check_dependencies():
 
 def main():
     """Run the application"""
-    # Setup bundled dependencies first
     setup_bundled_dependencies()
 
-    # Check what's available
     missing_deps = check_dependencies()
 
     if missing_deps:
@@ -84,11 +76,9 @@ def main():
             print(f"  - {dep}")
         print("Some features may not work correctly.")
 
-    # Start GUI
     root = TkinterDnD.Tk() if DND_OK else tk.Tk()
     app = WaterBillProcessorGUI(root)
 
-    # Show warnings in GUI if dependencies missing
     if missing_deps and hasattr(app, 'warnings_listbox'):
         for dep in missing_deps:
             app.warnings_listbox.insert(tk.END, f"Missing: {dep}")
