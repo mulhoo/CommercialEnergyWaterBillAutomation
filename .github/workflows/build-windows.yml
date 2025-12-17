@@ -30,6 +30,7 @@ jobs:
 
     - name: Create distribution package
       run: |
+        if (Test-Path distribution) { Remove-Item -Recurse -Force distribution }
         mkdir distribution
         copy dist\WaterBillProcessor.exe distribution\
         copy Install.bat distribution\
