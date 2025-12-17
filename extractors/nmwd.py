@@ -1,5 +1,5 @@
 """
-North Marin Water District PDF extractor - Fixed date extraction
+North Marin Water District PDF extractor - Fixed date extraction and large number handling
 """
 
 import os
@@ -51,9 +51,10 @@ class NMWDExtractor(BaseExtractor):
 
                 service_address = self._extract_pattern(text, r'SERVICE ADDRESS.*?(\d+[^,\n]*)')
 
+                # FIXED: Allow multiple comma groups for large numbers like 3,864,065
                 current_usage = (
-                    self._extract_number(text, r'CURRENT PERIOD:?\s*(\d+(?:,\d+)?)') or
-                    self._extract_number(text, r'(\d+)\s+GAL') or 0
+                    self._extract_number(text, r'CURRENT PERIOD:?\s*(\d{1,3}(?:,\d{3})*)') or
+                    self._extract_number(text, r'(\d{1,3}(?:,\d{3})*)\s+GAL') or 0
                 )
 
                 # Updated date extraction for NMWD
@@ -61,6 +62,7 @@ class NMWDExtractor(BaseExtractor):
                 service_period = f"{start_date} - {end_date}" if start_date and end_date else ""
 
                 print(f"DEBUG NMWD: Extracted dates - start: {start_date}, end: {end_date}")
+                print(f"DEBUG NMWD: Extracted usage: {current_usage:,} gallons")
 
                 if not account_number or total_due is None:
                     return None
@@ -89,28 +91,28 @@ class NMWDExtractor(BaseExtractor):
         Look for the service period dates, not due dates or other dates.
         """
         print(f"DEBUG NMWD: Looking for period dates in text...")
-        
+
         # Normalize different dash types
         normalized_text = text.replace("\u2012", "-").replace("\u2013", "-").replace("\u2014", "-").replace("\u2212", "-")
-        
+
         # NMWD-specific patterns - look for service period or billing period
         patterns = [
             # Pattern 1: "SERVICE PERIOD: MM/DD/YYYY - MM/DD/YYYY"
             r'SERVICE\s+PERIOD[:\s]*(\d{1,2}/\d{1,2}/\d{2,4})\s*[-–]\s*(\d{1,2}/\d{1,2}/\d{2,4})',
-            
+
             # Pattern 2: "BILLING PERIOD: MM/DD/YYYY - MM/DD/YYYY"
             r'BILLING\s+PERIOD[:\s]*(\d{1,2}/\d{1,2}/\d{2,4})\s*[-–]\s*(\d{1,2}/\d{1,2}/\d{2,4})',
-            
+
             # Pattern 3: "FROM MM/DD/YYYY TO MM/DD/YYYY" (but only in service context)
             r'(?:SERVICE|BILLING|PERIOD).*?FROM\s+(\d{1,2}/\d{1,2}/\d{2,4})\s+TO\s+(\d{1,2}/\d{1,2}/\d{2,4})',
-            
+
             # Pattern 4: Look for dates near "CURRENT PERIOD" text
             r'CURRENT\s+PERIOD.*?(\d{1,2}/\d{1,2}/\d{2,4})\s*[-–]\s*(\d{1,2}/\d{1,2}/\d{2,4})',
-            
+
             # Pattern 5: Look in a table structure for service dates
             r'(?:Service|Billing).*?(\d{1,2}/\d{1,2}/\d{2,4})\s*[-–]\s*(\d{1,2}/\d{1,2}/\d{2,4})',
         ]
-        
+
         for i, pattern in enumerate(patterns):
             match = re.search(pattern, normalized_text, re.IGNORECASE | re.DOTALL)
             if match:
@@ -118,7 +120,7 @@ class NMWDExtractor(BaseExtractor):
                 end_date = self._normalize_date(match.group(2))
                 print(f"DEBUG NMWD: Found dates with pattern {i+1}: {start_date} - {end_date}")
                 return start_date, end_date
-        
+
         # Fallback: Look for any two dates that might be service period
         # but be more careful about which ones we pick
         lines = normalized_text.split('\n')
@@ -126,7 +128,7 @@ class NMWDExtractor(BaseExtractor):
             # Skip lines that clearly contain due dates or bill dates
             if any(keyword in line.upper() for keyword in ['DUE', 'PAYMENT', 'BILL DATE', 'INVOICE']):
                 continue
-                
+
             # Look for two dates in lines that might contain service period info
             if any(keyword in line.upper() for keyword in ['PERIOD', 'SERVICE', 'USAGE', 'CURRENT']):
                 date_matches = re.findall(r'(\d{1,2}/\d{1,2}/\d{2,4})', line)
@@ -135,7 +137,7 @@ class NMWDExtractor(BaseExtractor):
                     end_date = self._normalize_date(date_matches[1])
                     print(f"DEBUG NMWD: Found dates in service line: {start_date} - {end_date}")
                     return start_date, end_date
-        
+
         print(f"DEBUG NMWD: No service period dates found")
         return "", ""
 
@@ -149,7 +151,7 @@ class NMWDExtractor(BaseExtractor):
                 if len(parts[2]) == 2:
                     parts[2] = "20" + parts[2]
                     date_str = "/".join(parts)
-            
+
             # Parse and reformat
             dt = datetime.strptime(date_str, "%m/%d/%Y")
             return dt.strftime("%m/%d/%Y")
