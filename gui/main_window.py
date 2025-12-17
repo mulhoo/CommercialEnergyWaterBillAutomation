@@ -3,10 +3,13 @@ Main GUI window for Water Bill PDF Processor - Windows Optimized
 """
 
 import os
+import logging
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from pathlib import Path
 from urllib.parse import urlparse, unquote
+
+logger = logging.getLogger(__name__)
 
 try:
     from tkinterdnd2 import DND_FILES
@@ -19,7 +22,7 @@ from extractors.nmwd import NMWDExtractor
 from extractors.mmwd import MMWDExtractor
 from processors.file_renamer import FileRenamer
 from processors.excel_processor import ExcelProcessor
-from config import BILLS_DIRS, month_year_folder, ensure_directories
+from config import BILLS_DIRS, REPORTS_ROOT, TEMPLATES, month_year_folder, ensure_directories
 
 class WaterBillProcessorGUI:
     """Main GUI application for water bill processing"""
@@ -54,15 +57,15 @@ class WaterBillProcessorGUI:
         try:
             ensure_directories()
         except Exception as e:
-            print(f"Warning: Could not create directories: {e}")
+            logger.warning(f"Could not create directories: {e}")
 
         self.setup_gui()
 
     def setup_gui(self):
-        """Setup the GUI components with Windows-optimized styling"""
-        # Configure overall styling for Windows
+        """Setup the GUI components with Windows styling"""
+        # Configure styling for Windows
         style = ttk.Style()
-        style.theme_use('vista')  # Better theme for Windows
+        style.theme_use('vista')
         
         # Configure custom styles
         style.configure("Title.TLabel", font=("Arial", 18, "bold"), foreground="#2c3e50")
@@ -132,7 +135,7 @@ class WaterBillProcessorGUI:
                 self.drop_zone.drop_target_register(DND_FILES)
                 self.drop_zone.dnd_bind("<<Drop>>", self._on_drop)
             except Exception as e:
-                print(f"DnD setup failed: {e}")
+                logger.warning(f"DnD setup failed: {e}")
 
         # Status banner and Process button
         status_frame = ttk.Frame(main_frame)
@@ -399,9 +402,9 @@ class WaterBillProcessorGUI:
                         shutil.copy2(p, permanent_path)
                         to_add.append(permanent_path)
                         outlook_temp_files.append(permanent_path)
-                        print(f"Copied Outlook attachment: {p} -> {permanent_path}")
+                        logger.info(f"Copied Outlook attachment: {p} -> {permanent_path}")
                     except Exception as e:
-                        print(f"Failed to copy Outlook attachment: {e}")
+                        logger.warning(f"Failed to copy Outlook attachment: {e}")
                         # Try to use the original path anyway
                         to_add.append(p)
                 else:
@@ -527,40 +530,17 @@ class WaterBillProcessorGUI:
                 self.status_var.set(f"Processing {os.path.basename(file_path)}...")
                 self.root.update()
 
-                print(f"\n=== DEBUG - File: {os.path.basename(file_path)} ===")
+                logger.info(f"\n=== Processing File: {os.path.basename(file_path)} ===")
 
                 try:
                     import pdfplumber
                     with pdfplumber.open(file_path) as pdf:
                         text = pdf.pages[0].extract_text()
-                        print(f"Raw text length: {len(text) if text else 0}")
+                        logger.debug(f"Raw text length: {len(text) if text else 0}")
                         if text:
-                            print(f"First 200 chars: {repr(text[:200])}")
-                            text_upper = text.upper()
-
-                            nmwd_indicators = [
-                                "NORTH MARIN WATER DISTRICT",
-                                "NORTH MARIN",
-                                "999 RUSH CREEK",
-                                "NOVATO",
-                                "NMWD.COM"
-                            ]
-
-                            found_nmwd = [ind for ind in nmwd_indicators if ind in text_upper]
-                            print(f"NMWD indicators found: {found_nmwd}")
-
-                            mmwd_indicators = [
-                                "MARIN WATER",
-                                "MARIN MUNICIPAL",
-                                "220 NELLEN AVENUE",
-                                "CORTE MADERA",
-                                "MARINWATER.ORG"
-                            ]
-
-                            found_mmwd = [ind for ind in mmwd_indicators if ind in text_upper]
-                            print(f"MMWD indicators found: {found_mmwd}")
+                            logger.debug(f"First 200 chars: {repr(text[:200])}")
                 except Exception as e:
-                    print(f"Debug extraction failed: {e}")
+                    logger.error(f"Debug extraction failed: {e}")
 
                 bill_data = None
                 actual_district = None
@@ -620,6 +600,7 @@ class WaterBillProcessorGUI:
 
                         successful_bills.append(bill_data)
                     except Exception as e:
+                        logger.error(f"Error processing bill: {e}", exc_info=True)
                         self.results_tree.insert("", "end", values=(
                             os.path.basename(file_path),
                             "Error",
@@ -635,6 +616,7 @@ class WaterBillProcessorGUI:
                     ))
 
             if successful_bills:
+                logger.info(f"\n=== Generating Excel Report for {len(successful_bills)} bills ===")
                 excel_path = self.excel_processor.generate_excel_report(successful_bills, selected_district)
 
                 if hasattr(self.excel_processor, 'last_unmatched'):
@@ -651,13 +633,58 @@ class WaterBillProcessorGUI:
 
                     success_message = "Processing complete!\n\n"
                     success_message += f"Excel report: {os.path.basename(excel_path)}\n"
+                    success_message += f"Location: {excel_path}\n"
                     success_message += f"Renamed PDFs in: {BILLS_DIRS[selected_district] / month_folder}"
                     if warnings:
                         success_message += f"\n\n⚠ {len(warnings)} warning(s) - see warnings panel below"
 
                     messagebox.showinfo("Success", success_message)
                 else:
-                    self.status_var.set(f"Processed {len(successful_bills)} files. Excel generation failed.")
+                    # Excel generation failed - show detailed error
+                    logger.error("Excel generation failed")
+                    self.status_var.set(f"Processed {len(successful_bills)} PDFs, but Excel generation FAILED.")
+                    
+                    # Check for common issues
+                    error_details = "Excel generation failed. Possible causes:\n\n"
+                    
+                    # Check if template exists
+                    template_path = TEMPLATES[selected_district]
+                    if not os.path.exists(template_path):
+                        error_details += f"❌ Template file not found:\n   {template_path}\n\n"
+                        logger.error(f"Template file not found: {template_path}")
+                    else:
+                        error_details += f"✓ Template file exists\n\n"
+                    
+                    # Check if output directory is accessible
+                    if not REPORTS_ROOT.exists():
+                        error_details += f"❌ Output directory not accessible:\n   {REPORTS_ROOT}\n\n"
+                        logger.error(f"Output directory not accessible: {REPORTS_ROOT}")
+                    else:
+                        error_details += f"✓ Output directory accessible\n\n"
+                    
+                    # Check log file location
+                    possible_desktops = [
+                        Path.home() / "Desktop" / "WaterBillProcessor_Logs",
+                        Path.home() / "OneDrive" / "Desktop" / "WaterBillProcessor_Logs",
+                    ]
+                    
+                    log_dir = None
+                    for loc in possible_desktops:
+                        if loc and loc.exists():
+                            log_dir = loc
+                            break
+                    
+                    if not log_dir:
+                        import tempfile
+                        log_dir = Path(tempfile.gettempdir()) / "WaterBillProcessor_Logs"
+                    
+                    error_details += f"📋 Check the log file for details:\n   {log_dir}\n\n"
+                    error_details += "Common fixes:\n"
+                    error_details += "• Close any open Excel files\n"
+                    error_details += "• Check network drive (X:) is connected\n"
+                    error_details += "• Verify write permissions to the folder"
+                    
+                    messagebox.showerror("Excel Generation Failed", error_details)
             else:
                 self.status_var.set("No files processed successfully.")
 
@@ -666,13 +693,14 @@ class WaterBillProcessorGUI:
                                       sticky=(tk.W, tk.E), pady=(0, 10))
                 if hasattr(self, "selected_frame") and self.selected_frame.winfo_ismapped():
                     self.selected_frame.grid_configure(row=5)
-                # Use the instance variable
                 self.results_frame.grid_configure(row=6)
             else:
                 self.warnings_frame.grid_remove()
-                # Use the instance variable
                 self.results_frame.grid_configure(row=5)
 
+        except Exception as e:
+            logger.exception("Fatal error in process_files")
+            messagebox.showerror("Error", f"An unexpected error occurred:\n\n{str(e)}")
         finally:
             self._processing = False
             self.set_buttons_enabled(True)
